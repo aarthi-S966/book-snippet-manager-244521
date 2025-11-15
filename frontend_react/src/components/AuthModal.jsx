@@ -26,12 +26,35 @@ export function AuthModal({ open, onClose, onSuccess }) {
     }
   }, [open]);
 
+  // Compute redirect URL for Supabase email links.
+  // We use hash-based routing; Supabase will preserve the origin and append auth params.
+  // Ensure the URL ends with "#/auth/callback" so our app can parse and complete the session.
   const redirectTo = (() => {
-    const base = env.FRONTEND_URL && env.FRONTEND_URL.trim().length > 0
+    // Determine base origin: prefer configured FRONTEND_URL, fallback to current origin.
+    const configured = env.FRONTEND_URL && env.FRONTEND_URL.trim().length > 0
       ? env.FRONTEND_URL.trim()
       : window.location.origin;
-    // CRA uses hash routing; ensure redirect retains origin (Supabase will append tokens to URL)
-    return base;
+
+    // Strip any trailing slash to normalize
+    const withoutTrailing = configured.replace(/\/+$/, "");
+
+    // If configured already contains a hash router path, normalize to end with '/auth/callback'
+    if (withoutTrailing.includes("#")) {
+      // Normalize any spaces around hash
+      const norm = withoutTrailing.replace("# /", "#/");
+
+      // Ensure there's exactly one slash after hash and append /auth/callback if missing
+      const [pre, hashAndPath] = norm.split("#");
+      const path = hashAndPath?.startsWith("/") ? hashAndPath : `/${hashAndPath || ""}`;
+      const baseWithHash = `${pre}#${path.replace(/\/+$/, "")}`;
+
+      return baseWithHash.endsWith("/auth/callback")
+        ? baseWithHash
+        : `${baseWithHash}/auth/callback`;
+    }
+
+    // No hash present; append "#/auth/callback"
+    return `${withoutTrailing}#/auth/callback`;
   })();
 
   const handleSubmit = async (e) => {
