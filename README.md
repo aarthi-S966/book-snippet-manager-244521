@@ -1,1 +1,3 @@
-# book-snippet-manager-244521
+# Project Repository
+
+This is the initial README file for the project.
