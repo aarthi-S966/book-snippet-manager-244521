@@ -47,10 +47,16 @@ export function SnippetDetail({ id, navigate, user, onSignInClick, onSignOut }) 
   };
 
   const copyLink = async () => {
-    // Use hash-based route for CRA so shared links work correctly
-    const url = `${window.location.origin}# /s/${id}`.replace("# /", "#/");
-    await navigator.clipboard.writeText(url);
-    alert("Link copied!");
+    // Build correct hash-based URL without stray spaces and ensure "#/s/:id"
+    const base = window.location.origin.replace(/\/+$/, "");
+    const url = `${base}#/s/${id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      alert("Link copied!");
+    } catch (e) {
+      // Fallback: show prompt if clipboard API not available
+      window.prompt("Copy this link:", url);
+    }
   };
 
   return (

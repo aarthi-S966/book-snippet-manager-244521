@@ -30,7 +30,18 @@ export function Home({ navigate, user, onSignInClick, onSignOut }) {
           <Sidebar tags={tags} activeTag={activeTag} onSelectTag={setActiveTag} />
           <main>
             <div style={{ marginBottom: 12, display: "flex", justifyContent: "flex-end" }}>
-              <Button onClick={() => navigate("/snippet/new")}>New Snippet</Button>
+              <Button
+                onClick={() => {
+                  if (!user) {
+                    // Prompt sign-in if not authenticated before navigating to create page
+                    onSignInClick?.();
+                    return;
+                  }
+                  navigate("/snippet/new");
+                }}
+              >
+                New Snippet
+              </Button>
             </div>
             {loading && <Card style={{ padding: 12 }}>Loading...</Card>}
             {!loading && errorMsg && <Card style={{ padding: 12, color: "#EF4444" }}>{errorMsg}</Card>}
