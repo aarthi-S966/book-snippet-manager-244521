@@ -52,4 +52,4 @@ Notes:
 Environment variables (frontend):
 - REACT_APP_SUPABASE_URL
 - REACT_APP_SUPABASE_KEY
-- REACT_APP_FRONTEND_URL (for magic-link and signup redirect)
+- REACT_APP_FRONTEND_URL (for magic-link and signup redirect; should be added to Supabase Auth Redirect URLs)

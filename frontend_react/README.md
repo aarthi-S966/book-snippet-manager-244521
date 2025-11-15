@@ -14,8 +14,12 @@ npm install
 - Set:
   - REACT_APP_SUPABASE_URL
   - REACT_APP_SUPABASE_KEY
-  - REACT_APP_FRONTEND_URL (optional; defaults to current origin)
+  - REACT_APP_FRONTEND_URL (recommended for magic link/signup redirects; defaults to current origin)
   
+Important:
+- In your Supabase project, add the FRONTEND URL to Auth > URL Configuration > Redirect URLs. For local dev, use http://localhost:3000
+- This app uses hash-based routing (/#/...). Supabase will return to the provided origin; the app will detect the session automatically.
+
 See `README_SUPABASE.md` for the expected Supabase schema and RLS policies.
 
 3) Start

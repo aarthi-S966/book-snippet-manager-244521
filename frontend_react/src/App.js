@@ -40,7 +40,7 @@ function SetupNotice() {
     <div className="container">
       <div className="card" style={{ padding: 16 }}>
         <h2>Configuration required</h2>
-        <p>Please set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_KEY in your environment.</p>
+        <p>Please set REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_KEY in your environment. See .env.example and README_SUPABASE.md.</p>
       </div>
     </div>
   );
@@ -60,6 +60,7 @@ function App() {
   useEffect(() => {
     const handler = () => setRouteState(parseHashRoute());
     window.addEventListener("hashchange", handler);
+    // Default to home for empty hash
     if (!window.location.hash) window.location.hash = "/";
     return () => window.removeEventListener("hashchange", handler);
   }, []);
@@ -71,13 +72,23 @@ function App() {
   // Auth: load session and subscribe to changes
   useEffect(() => {
     if (!supabase) return;
+    let isMounted = true;
     supabase.auth.getSession().then(({ data }) => {
+      if (!isMounted) return;
       setUser(data.session?.user ?? null);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isMounted) return;
       setUser(session?.user ?? null);
+      // Close auth modal on sign in/up success
+      if (session?.user && (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED")) {
+        setAuthModalOpen(false);
+      }
     });
-    return () => sub?.subscription?.unsubscribe();
+    return () => {
+      isMounted = false;
+      sub?.subscription?.unsubscribe();
+    };
   }, [supabase]);
 
   if (!supabase) {
