@@ -47,7 +47,8 @@ export function SnippetDetail({ id, navigate, user, onSignInClick, onSignOut }) 
   };
 
   const copyLink = async () => {
-    const url = `${window.location.origin}/s/${id}`;
+    // Use hash-based route for CRA so shared links work correctly
+    const url = `${window.location.origin}# /s/${id}`.replace("# /", "#/");
     await navigator.clipboard.writeText(url);
     alert("Link copied!");
   };

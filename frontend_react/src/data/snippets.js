@@ -58,14 +58,21 @@ export async function createSnippet(payload) {
   const supabase = getSupabaseClient();
   if (!supabase) throw new Error("Supabase not configured");
   try {
+    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+    if (sessionErr) throw sessionErr;
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) throw new Error("You must be signed in to create a snippet.");
+
     const now = new Date().toISOString();
-    const insert = { ...payload, created_at: now, updated_at: now };
+    // Attach owner_id for RLS policies to permit access
+    const insert = { ...payload, owner_id: userId, created_at: now, updated_at: now, is_public: !!payload.is_public };
     const { data, error } = await supabase.from("snippets").insert(insert).select("*").single();
     if (error) throw error;
     return data;
   } catch (err) {
     if (env.isDev) env.log.error("createSnippet error", err);
-    throw new Error("Unable to create snippet.");
+    // Avoid leaking raw supabase error details
+    throw new Error(typeof err?.message === "string" ? err.message : "Unable to create snippet.");
   }
 }
 
@@ -75,12 +82,28 @@ export async function updateSnippet(id, patch) {
   const supabase = getSupabaseClient();
   if (!supabase) throw new Error("Supabase not configured");
   try {
-    const { data, error } = await supabase.from("snippets").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", id).select("*").single();
+    // Ensure user is owner before updating (client-side guard; RLS must still enforce)
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) throw new Error("You must be signed in to update a snippet.");
+
+    const { data: existing, error: fetchErr } = await supabase.from("snippets").select("id, owner_id").eq("id", id).single();
+    if (fetchErr) throw fetchErr;
+    if (existing?.owner_id && existing.owner_id !== userId) {
+      throw new Error("You do not have permission to modify this snippet.");
+    }
+
+    const { data, error } = await supabase
+      .from("snippets")
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .single();
     if (error) throw error;
     return data;
   } catch (err) {
     if (env.isDev) env.log.error("updateSnippet error", err);
-    throw new Error("Unable to update snippet.");
+    throw new Error(typeof err?.message === "string" ? err.message : "Unable to update snippet.");
   }
 }
 
@@ -90,12 +113,22 @@ export async function deleteSnippet(id) {
   const supabase = getSupabaseClient();
   if (!supabase) throw new Error("Supabase not configured");
   try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) throw new Error("You must be signed in to delete a snippet.");
+
+    const { data: existing, error: fetchErr } = await supabase.from("snippets").select("id, owner_id").eq("id", id).single();
+    if (fetchErr) throw fetchErr;
+    if (existing?.owner_id && existing.owner_id !== userId) {
+      throw new Error("You do not have permission to delete this snippet.");
+    }
+
     const { error } = await supabase.from("snippets").delete().eq("id", id);
     if (error) throw error;
     return true;
   } catch (err) {
     if (env.isDev) env.log.error("deleteSnippet error", err);
-    throw new Error("Unable to delete snippet.");
+    throw new Error(typeof err?.message === "string" ? err.message : "Unable to delete snippet.");
   }
 }
 
@@ -105,11 +138,26 @@ export async function togglePublic(id, isPublic) {
   const supabase = getSupabaseClient();
   if (!supabase) throw new Error("Supabase not configured");
   try {
-    const { data, error } = await supabase.from("snippets").update({ is_public: !!isPublic, updated_at: new Date().toISOString() }).eq("id", id).select("*").single();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id;
+    if (!userId) throw new Error("You must be signed in to change sharing settings.");
+
+    const { data: existing, error: fetchErr } = await supabase.from("snippets").select("id, owner_id").eq("id", id).single();
+    if (fetchErr) throw fetchErr;
+    if (existing?.owner_id && existing.owner_id !== userId) {
+      throw new Error("You do not have permission to change sharing for this snippet.");
+    }
+
+    const { data, error } = await supabase
+      .from("snippets")
+      .update({ is_public: !!isPublic, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .single();
     if (error) throw error;
     return data;
   } catch (err) {
     if (env.isDev) env.log.error("togglePublic error", err);
-    throw new Error("Unable to update sharing settings.");
+    throw new Error(typeof err?.message === "string" ? err.message : "Unable to update sharing settings.");
   }
 }
