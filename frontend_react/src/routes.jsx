@@ -40,8 +40,9 @@ export function Router({ route, navigate, params, user, onSignInClick, onSignOut
 
 /** PUBLIC_INTERFACE
  * AuthCallback component finalizes Supabase auth flow and redirects to home.
- * - For implicit/hash flows, supabase-js detectSessionInUrl handles it.
- * - For PKCE/code flow, attempt to exchange code for a session, then navigate home.
+ * - Handles tokens/params in both query and hash for hash-based routing.
+ * - Attempts PKCE exchange when a code is present.
+ * - Shows a friendly message if token is invalid/expired, then navigates home.
  */
 function AuthCallback({ navigate }) {
   const [status, setStatus] = useState("Finishing sign-in...");
@@ -54,23 +55,41 @@ function AuthCallback({ navigate }) {
 
     const finish = async () => {
       try {
-        // Check for authorization code in URL (query or hash)
-        const url = new URL(window.location.href);
-        const queryCode = url.searchParams.get("code");
-        // Hash may look like: #/auth/callback?code=... or other params
-        const hashAfterAuth = window.location.hash.replace(/^#\/?auth\/callback\??/i, "");
-        const hashParams = new URLSearchParams(hashAfterAuth);
-        const hashCode = hashParams.get("code");
-        const hasCode = !!(queryCode || hashCode);
+        const fullUrl = window.location.href;
 
-        if (hasCode && typeof supabase.auth.exchangeCodeForSession === "function") {
-          await supabase.auth.exchangeCodeForSession(window.location.href);
+        // Parse query params (for code flow)
+        const url = new URL(fullUrl);
+        const queryCode = url.searchParams.get("code");
+        const queryError = url.searchParams.get("error_description") || url.searchParams.get("error");
+
+        // Parse hash section after /auth/callback for both ? and # formats
+        // e.g. #/auth/callback?code=... or #/auth/callback#access_token=...
+        const hash = window.location.hash || "";
+        const afterCallback = hash.replace(/^#\/?auth\/callback[?#]?/i, "");
+        const hashParams = new URLSearchParams(afterCallback);
+        const hashCode = hashParams.get("code");
+        const hashError = hashParams.get("error_description") || hashParams.get("error");
+
+        const hasError = !!(queryError || hashError);
+        if (hasError) {
+          setStatus("The sign-in link is invalid or has expired. Please request a new link.");
+          setTimeout(() => navigate("/"), 1200);
+          return;
         }
-      } catch (_) {
-        // Ignore; onAuthStateChange or detectSessionInUrl may still complete session.
+
+        const hasCode = !!(queryCode || hashCode);
+        // If PKCE code flow: exchange code for session
+        if (hasCode && typeof supabase.auth.exchangeCodeForSession === "function") {
+          await supabase.auth.exchangeCodeForSession(fullUrl);
+        }
+
+        // detectSessionInUrl=true (set in supabase client) will also process hash tokens automatically
+        setStatus("Signed in. Redirecting...");
+      } catch {
+        setStatus("Finished processing sign-in. Redirecting...");
       } finally {
         // Always navigate to home to clear callback URL
-        navigate("/");
+        setTimeout(() => navigate("/"), 300);
       }
     };
     finish();
@@ -87,14 +106,24 @@ function AuthCallback({ navigate }) {
 
 /** PUBLIC_INTERFACE
  * parseHashRoute converts window.location.hash to route and params
+ * Handles potential URL formats such as:
+ * - #/auth/callback?code=...
+ * - #/auth/callback#access_token=...
+ * - #/snippet/ID
+ * - #/s/ID
  */
 export function parseHashRoute() {
   const rawHash = window.location.hash || "";
   // Normalize any accidental space after '#'
   const normalizedHash = rawHash.replace("# /", "#/");
 
-  const hash = normalizedHash.replace(/^#/, "") || "/";
-  const segments = hash.split("/").filter(Boolean);
+  // Strip leading '#'
+  let hash = normalizedHash.replace(/^#/, "");
+  if (!hash || hash === "") return { route: "/", params: {} };
+
+  // Extract path portion before any query or additional hash params
+  const pathPart = hash.split(/[?#]/)[0] || "/";
+  const segments = pathPart.split("/").filter(Boolean);
 
   if (segments.length === 0) return { route: "/", params: {} };
   if (segments[0] === "auth" && segments[1] === "callback") return { route: "/auth/callback", params: {} };
