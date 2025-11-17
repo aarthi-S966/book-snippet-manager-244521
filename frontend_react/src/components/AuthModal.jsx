@@ -31,12 +31,11 @@ export function AuthModal({ open, onClose, onSuccess }) {
   // Ensure the URL ends with "#/auth/callback" so our app can parse and complete the session.
   const redirectTo = (() => {
     // Determine base origin: prefer configured FRONTEND_URL, fallback to current origin.
-    const configured = env.FRONTEND_URL && env.FRONTEND_URL.trim().length > 0
-      ? env.FRONTEND_URL.trim()
-      : window.location.origin;
+    const configuredRaw = env.FRONTEND_URL && typeof env.FRONTEND_URL === "string" ? env.FRONTEND_URL : "";
+    const configured = configuredRaw.trim().length > 0 ? configuredRaw.trim() : window.location.origin;
 
     // Strip any trailing slash to normalize
-    const withoutTrailing = configured.replace(/\/+$/, "");
+    const withoutTrailing = configured.replace(/\/*$/, "");
 
     // If configured already contains a hash router path, normalize to end with '/auth/callback'
     if (withoutTrailing.includes("#")) {
@@ -46,7 +45,7 @@ export function AuthModal({ open, onClose, onSuccess }) {
       // Ensure there's exactly one slash after hash and append /auth/callback if missing
       const [pre, hashAndPath] = norm.split("#");
       const path = hashAndPath?.startsWith("/") ? hashAndPath : `/${hashAndPath || ""}`;
-      const baseWithHash = `${pre}#${path.replace(/\/+$/, "")}`;
+      const baseWithHash = `${pre}#${path.replace(/\/*$/, "")}`;
 
       return baseWithHash.endsWith("/auth/callback")
         ? baseWithHash

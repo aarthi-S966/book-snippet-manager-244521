@@ -13,7 +13,7 @@ import { getSupabaseClient } from "./lib/supabaseClient";
  */
 export function Router({ route, navigate, params, user, onSignInClick, onSignOut }) {
   const env = getEnv();
-  const hcPath = (env.HEALTHCHECK_PATH || "/healthz").replace(/^\/+/, "/");
+  const hcPath = (env.HEALTHCHECK_PATH || "/healthz").replace(/^\/*/, "/");
 
   // Handle Supabase auth callback route
   if (route === "/auth/callback") {
@@ -47,6 +47,7 @@ export function Router({ route, navigate, params, user, onSignInClick, onSignOut
 function AuthCallback({ navigate }) {
   const [status, setStatus] = useState("Finishing sign-in...");
   useEffect(() => {
+    const env = getEnv();
     const supabase = getSupabaseClient();
     if (!supabase) {
       setStatus("Supabase not configured.");
@@ -63,7 +64,9 @@ function AuthCallback({ navigate }) {
         const queryError = url.searchParams.get("error_description") || url.searchParams.get("error");
 
         // Parse hash section after /auth/callback for both ? and # formats
-        // e.g. #/auth/callback?code=... or #/auth/callback#access_token=...
+        // Accept patterns:
+        // - #/auth/callback?code=...
+        // - #/auth/callback#access_token=...
         const hash = window.location.hash || "";
         const afterCallback = hash.replace(/^#\/?auth\/callback[?#]?/i, "");
         const hashParams = new URLSearchParams(afterCallback);
@@ -73,6 +76,9 @@ function AuthCallback({ navigate }) {
         const hasError = !!(queryError || hashError);
         if (hasError) {
           setStatus("The sign-in link is invalid or has expired. Please request a new link.");
+          if (env.isDev) env.log.warn("Auth callback error:", queryError || hashError);
+          // Clean URL then redirect home
+          window.history.replaceState({}, document.title, `${window.location.origin}#/`);
           setTimeout(() => navigate("/"), 1200);
           return;
         }
@@ -80,15 +86,31 @@ function AuthCallback({ navigate }) {
         const hasCode = !!(queryCode || hashCode);
         // If PKCE code flow: exchange code for session
         if (hasCode && typeof supabase.auth.exchangeCodeForSession === "function") {
-          await supabase.auth.exchangeCodeForSession(fullUrl);
+          if (env.isDev) env.log.info("Exchanging PKCE code for session...");
+          const { error } = await supabase.auth.exchangeCodeForSession(fullUrl);
+          if (error) {
+            if (env.isDev) env.log.error("exchangeCodeForSession error", error);
+            setStatus("Could not complete sign-in. Please try again.");
+          }
+        } else {
+          // For implicit flow with tokens in hash, detectSessionInUrl:true should handle it automatically.
+          if (env.isDev) env.log.debug("No PKCE code found; relying on detectSessionInUrl processing.");
         }
 
-        // detectSessionInUrl=true (set in supabase client) will also process hash tokens automatically
-        setStatus("Signed in. Redirecting...");
-      } catch {
+        // Verify session is present before redirect
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.user) {
+          setStatus("Signed in. Redirecting...");
+        } else {
+          setStatus("Processed sign-in link. Redirecting...");
+        }
+      } catch (e) {
+        if (env.isDev) env.log.error("Auth callback processing failed", e);
         setStatus("Finished processing sign-in. Redirecting...");
       } finally {
-        // Always navigate to home to clear callback URL
+        // Clean the URL to remove tokens and callback path to avoid re-processing
+        window.history.replaceState({}, document.title, `${window.location.origin}#/`);
+        // Always navigate to home to clear callback URL and trigger auth-aware UI
         setTimeout(() => navigate("/"), 300);
       }
     };

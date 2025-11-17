@@ -15,14 +15,17 @@ npm install
   - REACT_APP_SUPABASE_URL
   - REACT_APP_SUPABASE_KEY
   - REACT_APP_FRONTEND_URL (recommended for magic link/signup redirects; defaults to current origin)
-  
+
 Important for Supabase auth:
 - This app uses hash-based routing (/#/...). The magic-link redirect MUST end up at `#/auth/callback`.
 - Recommended local dev redirect URL to add in Supabase Auth > URL Configuration > Redirect URLs:
   - http://localhost:3000/#/auth/callback
 - If you deploy to a preview URL, ensure the preview origin is included and also ends with `#/auth/callback`, e.g.:
   - https://your-preview.example.com/#/auth/callback
-- The app computes emailRedirectTo using REACT_APP_FRONTEND_URL (or current origin as a fallback) and appends `#/auth/callback`.
+- Supabase may also send PKCE code links to the callback with the `code` in the query string (e.g. `http://localhost:3000/#/auth/callback?code=...`). Our callback handler supports both query (`?code=`) and hash token formats (`#/auth/callback#access_token=...`).
+- Ensure your Supabase project's Auth > URL Configuration includes ALL relevant redirect URL variants you use (local, preview, production), pointing specifically to `#/auth/callback`.
+
+The app computes `emailRedirectTo` using `REACT_APP_FRONTEND_URL` (or current origin as a fallback) and appends `#/auth/callback`. Avoid trailing slashes or spaces.
 
 See `README_SUPABASE.md` for the expected Supabase schema and RLS policies.
 
