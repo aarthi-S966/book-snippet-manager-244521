@@ -1,68 +1,47 @@
 # Supabase Schema and RLS Notes
 
-The React app expects a `snippets` table with the following columns (SQL shown for reference):
+This project includes a CLI to create Supabase schema (profiles, books, snippets, shares), add FKs/indexes, enable RLS, and define secure policies. It uses the Supabase SQL API with a service role key provided at runtime (never committed).
 
-```sql
-create extension if not exists pgcrypto;
+## Apply Schema
 
-create table if not exists public.snippets (
-  id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references auth.users(id) on delete cascade,
-  title text not null,
-  author text,
-  "bookTitle" text,
-  content text not null,
-  tags text[] default '{}',
-  is_public boolean default false,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
+1) Ensure you have the following environment variables available when running the CLI (do not commit secrets):
+- REACT_APP_SUPABASE_URL (or SUPABASE_URL)
+- SUPABASE_SERVICE_ROLE_KEY (or REACT_APP_SUPABASE_SERVICE_ROLE_KEY)
 
--- Optional: books table if you later want to group snippets by book
--- (not required by current UI which stores bookTitle directly on the snippet)
--- create table if not exists public.books (
---   id uuid primary key default gen_random_uuid(),
---   owner_id uuid not null references auth.users(id) on delete cascade,
---   title text not null,
---   author text,
---   created_at timestamptz default now()
--- );
+2) Run:
+```bash
+# from frontend_react/
+npm run supabase:apply
 
--- Row Level Security
-alter table public.snippets enable row level security;
-
--- Policies
-create policy "Allow read own or public" on public.snippets
-for select
-using (
-  is_public = true
-  or auth.uid() = owner_id
-);
-
-create policy "Allow insert for authenticated as owner" on public.snippets
-for insert
-to authenticated
-with check (auth.uid() = owner_id);
-
-create policy "Allow update for owner" on public.snippets
-for update
-to authenticated
-using (auth.uid() = owner_id)
-with check (auth.uid() = owner_id);
-
-create policy "Allow delete for owner" on public.snippets
-for delete
-to authenticated
-using (auth.uid() = owner_id);
+# optional seeds (skips user-owned inserts due to RLS context)
+SEED_SAMPLE=true npm run supabase:apply
 ```
 
-Notes:
-- The client attaches `owner_id` from the current session when creating a snippet.
-- Update/delete/toggle sharing operations are guarded client-side and must also pass RLS policies server-side.
-- Public view (`#/s/:id`) loads if `is_public = true` (the app uses the same table; no separate share token table is required).
-- If you add books later, mirror policies using `owner_id` and reference snippets to books via a foreign key.
+The script reads SQL from `supabase/schema.sql` and applies it idempotently.
+
+## Schema Overview (created by schema.sql)
+
+- public.profiles (id uuid PK references auth.users(id), display_name, avatar_url, created_at)
+- public.books (id uuid PK, user_id uuid FK -> auth.users, title, author, cover_url, created_at)
+- public.snippets (id uuid PK, user_id uuid FK -> auth.users, book_id uuid FK -> books, content, page, tags[], created_at)
+- public.shares (id uuid PK, snippet_id FK -> snippets, is_public bool, share_token unique, created_at)
+- Indexes on user_id/book_id/snippet_id/share_token
+- RLS enabled on profiles, books, snippets, shares
+- Policies restricting access to owners via auth.uid()
+- Public read-only view `public.public_snippet_view` (anon granted SELECT) exposing only publicly shared snippets via shares
+
+## Frontend Expectations
+
+The current UI primarily interacts with a simple `snippets` model. If you already had an earlier simple schema, you can migrate content or adapt minimal code as needed. The provided schema supports:
+- Per-user ownership via `user_id`
+- Optional association to a `book_id`
+- Public sharing handled via `shares` table and `public_snippet_view` for anonymous/permalink access
 
 Environment variables (frontend):
 - REACT_APP_SUPABASE_URL
 - REACT_APP_SUPABASE_KEY
 - REACT_APP_FRONTEND_URL (for magic-link and signup redirect; should be added to Supabase Auth Redirect URLs)
+
+Security notes:
+- Never commit the service role key. Provide it at runtime only for running the schema CLI or in CI.
+- Policies and RLS ensure users only see/manage their own records; public reading is limited to the dedicated view.
