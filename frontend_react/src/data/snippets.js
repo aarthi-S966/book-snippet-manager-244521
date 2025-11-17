@@ -37,7 +37,9 @@ export async function getSnippets({ search = "", tag = "", limit = 20, offset = 
   }
 }
 
-/** PUBLIC_INTERFACE */
+/** PUBLIC_INTERFACE
+ * getSnippetById fetches a snippet by id; RLS allows owner or public snippets.
+ */
 export async function getSnippetById(id) {
   const env = getEnv();
   const supabase = getSupabaseClient();

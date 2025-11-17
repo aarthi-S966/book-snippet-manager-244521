@@ -12,7 +12,7 @@ export function Navbar({ onSearch, user, onSignInClick, onSignOut }) {
   return (
     <nav className="ocean-header" style={{ padding: "10px 16px", boxShadow: "var(--shadow-sm)" }}>
       <div className="container" style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ fontWeight: 800, color: "#111827" }}>Book Snippet Manager</div>
+        <a href="#/" style={{ fontWeight: 800, color: "#111827", textDecoration: "none" }}>Book Snippet Manager</a>
         <div style={{ flex: 1, maxWidth: 520 }}>
           <Input
             aria-label="Search snippets"
@@ -28,7 +28,7 @@ export function Navbar({ onSearch, user, onSignInClick, onSignOut }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {user ? (
             <>
-              <div aria-label="user-email" style={{ fontSize: 14 }}>{user.email}</div>
+              <a href="#/profile" aria-label="profile" style={{ fontSize: 14, textDecoration: "none", color: "#111827" }}>{user.email}</a>
               <Button variant="secondary" onClick={onSignOut}>Sign out</Button>
             </>
           ) : (

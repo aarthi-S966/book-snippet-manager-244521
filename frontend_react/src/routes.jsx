@@ -5,6 +5,7 @@ import { SnippetDetail } from "./pages/SnippetDetail";
 import { PublicSnippet } from "./pages/PublicSnippet";
 import { NotFound } from "./pages/NotFound";
 import { Healthcheck } from "./pages/Healthcheck";
+import { Profile } from "./pages/Profile";
 import { getEnv } from "./config/env";
 import { getSupabaseClient } from "./lib/supabaseClient";
 
@@ -33,6 +34,9 @@ export function Router({ route, navigate, params, user, onSignInClick, onSignOut
   if (route.startsWith("/s/")) {
     const id = params.id;
     return <PublicSnippet id={id} />;
+  }
+  if (route === "/profile") {
+    return <Profile navigate={navigate} user={user} onSignInClick={onSignInClick} onSignOut={onSignOut} />;
   }
   if (route === hcPath) return <Healthcheck />;
   return <NotFound />;

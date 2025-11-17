@@ -3,6 +3,8 @@
 The React app expects a `snippets` table with the following columns (SQL shown for reference):
 
 ```sql
+create extension if not exists pgcrypto;
+
 create table if not exists public.snippets (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
@@ -15,6 +17,16 @@ create table if not exists public.snippets (
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+-- Optional: books table if you later want to group snippets by book
+-- (not required by current UI which stores bookTitle directly on the snippet)
+-- create table if not exists public.books (
+--   id uuid primary key default gen_random_uuid(),
+--   owner_id uuid not null references auth.users(id) on delete cascade,
+--   title text not null,
+--   author text,
+--   created_at timestamptz default now()
+-- );
 
 -- Row Level Security
 alter table public.snippets enable row level security;
@@ -47,7 +59,8 @@ using (auth.uid() = owner_id);
 Notes:
 - The client attaches `owner_id` from the current session when creating a snippet.
 - Update/delete/toggle sharing operations are guarded client-side and must also pass RLS policies server-side.
-- Public view (`#/s/:id`) loads if `is_public = true`.
+- Public view (`#/s/:id`) loads if `is_public = true` (the app uses the same table; no separate share token table is required).
+- If you add books later, mirror policies using `owner_id` and reference snippets to books via a foreign key.
 
 Environment variables (frontend):
 - REACT_APP_SUPABASE_URL

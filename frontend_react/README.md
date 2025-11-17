@@ -2,6 +2,15 @@
 
 Modern, lightweight UI following the Ocean Professional theme.
 
+## Features
+
+- Authentication (email/password and magic link via Supabase)
+- Snippet library with search and tag filters
+- Create, edit, delete snippets with validation
+- Public sharing toggle (is_public) and copy share link (hash route `#/s/:id`)
+- Responsive layout with top navbar and sidebar filters
+- RLS-safe direct Supabase access (no backend required)
+
 ## Setup
 
 1) Install dependencies
