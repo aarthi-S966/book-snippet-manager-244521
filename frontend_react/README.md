@@ -7,9 +7,9 @@ Modern, lightweight UI following the Ocean Professional theme.
 - Authentication (email/password and magic link via Supabase)
 - Snippet library with search and tag filters
 - Create, edit, delete snippets with validation
-- Public sharing toggle (is_public) and copy share link (hash route `#/s/:id`)
+- Public sharing toggle (is_public) and copy share link (hash route `#/s/:token`)
 - Responsive layout with top navbar and sidebar filters
-- RLS-safe direct Supabase access (no backend required)
+- Uses backend API for data (attaches Supabase session JWT)
 
 ## Setup
 
@@ -24,6 +24,7 @@ npm install
   - REACT_APP_SUPABASE_URL
   - REACT_APP_SUPABASE_KEY
   - REACT_APP_FRONTEND_URL (recommended for magic link/signup redirects; defaults to current origin)
+  - REACT_APP_API_BASE or REACT_APP_BACKEND_URL (backend API base, e.g. http://localhost:8000)
 
 Important for Supabase auth:
 - This app uses hash-based routing (/#/...). The magic-link redirect MUST end up at `#/auth/callback`.
@@ -36,16 +37,25 @@ Important for Supabase auth:
 
 The app computes `emailRedirectTo` using `REACT_APP_FRONTEND_URL` (or current origin as a fallback) and appends `#/auth/callback`. Avoid trailing slashes or spaces.
 
-See `README_SUPABASE.md` for the expected Supabase schema and RLS policies.
-
 3) Start
 ```bash
 npm start
 ```
 
+## Backend API Integration
+
+- Base URL is read from `REACT_APP_API_BASE` or `REACT_APP_BACKEND_URL`.
+- All authenticated requests include `Authorization: Bearer <supabase_session_access_token>`.
+- Implemented endpoints used by the UI:
+  - GET `/health`
+  - GET `/profile/me`
+  - Snippets: `GET /snippets`, `POST /snippets`, `PATCH /snippets/:id`, `DELETE /snippets/:id`
+  - Shares: `POST /shares/:snippetId`, `GET /shares/:token` (for public snippet view)
+  - Books: `GET /books`, `POST /books`, `GET /books/:id`, `PATCH /books/:id`, `DELETE /books/:id`
+
 ## Notes
 
 - No secrets are hardcoded. All configuration via environment variables.
-- Public route: `#/s/:id` for read-only shared snippets. When copying links, ensure the `#/` hash is present.
+- Public route: `#/s/:token` for read-only shared snippets via backend share token endpoint.
 - Routes use hash-based navigation to avoid extra dependencies.
-- Snippet mutations (create/update/delete/toggle public) require an authenticated user and are authorized by RLS using `owner_id`. The client also applies owner checks for better UX.
+- Error messages shown to users are friendly and do not expose sensitive details. Internally, additional info is logged in development only.

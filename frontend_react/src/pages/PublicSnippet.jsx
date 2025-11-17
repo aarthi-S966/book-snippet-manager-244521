@@ -1,16 +1,43 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Card } from "../components/ui/Card";
-import { useSnippetQuery } from "../hooks/useSnippet";
+import { Api } from "../lib/apiClient";
+import { getEnv } from "../config/env";
 
 /** PUBLIC_INTERFACE
- * Public read-only snippet page at /s/:id
+ * Public read-only snippet page at /s/:token
+ * Uses backend GET /shares/:token to retrieve public snippet.
  */
 export function PublicSnippet({ id }) {
-  const { snippet, loading, errorMsg } = useSnippetQuery(id);
+  const env = getEnv();
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [snippet, setSnippet] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setErrorMsg("");
+    Api.getShareByToken(id)
+      .then((res) => {
+        if (!active) return;
+        // Backend may return { snippet, ... } or the snippet directly
+        const sn = res?.snippet ?? res;
+        if (!sn) throw new Error("Not found");
+        setSnippet(sn);
+      })
+      .catch((e) => {
+        if (env.isDev) env.log.error("PublicSnippet error", e);
+        setErrorMsg(e?.message || "Unable to load public snippet.");
+      })
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   if (loading) return <div className="container"><Card style={{ padding: 16 }}>Loading...</Card></div>;
   if (errorMsg) return <div className="container"><Card style={{ padding: 16, color: "#EF4444" }}>{errorMsg}</Card></div>;
-  if (!snippet || !snippet.is_public) return <div className="container"><Card style={{ padding: 16 }}>This snippet is not public.</Card></div>;
+  if (!snippet) return <div className="container"><Card style={{ padding: 16 }}>This snippet is not public or does not exist.</Card></div>;
 
   return (
     <div className="container">

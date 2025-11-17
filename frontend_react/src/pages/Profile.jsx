@@ -4,25 +4,48 @@ import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { getSupabaseClient } from "../lib/supabaseClient";
 import { Toast } from "../components/ui/Toast";
+import { Api } from "../lib/apiClient";
+import { getEnv } from "../config/env";
 
 /** PUBLIC_INTERFACE
- * Profile page displays basic session info and a sign-out action.
+ * Profile page displays backend /profile/me and session info with sign-out action.
  */
 export function Profile({ navigate, user, onSignInClick, onSignOut }) {
   const supabase = getSupabaseClient();
+  const env = getEnv();
   const [error, setError] = useState("");
-  const [profileEmail, setProfileEmail] = useState(user?.email || "");
   const [loading, setLoading] = useState(false);
+  const [profile, setProfile] = useState(null);
+
+  const loadProfile = async () => {
+    if (!user) return;
+    setLoading(true);
+    setError("");
+    try {
+      const me = await Api.me();
+      setProfile(me || null);
+    } catch (e) {
+      if (env.isDev) env.log.error("Profile load error", e);
+      setError(e?.message || "Could not load profile.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setProfileEmail(user?.email || "");
-  }, [user]);
+    setProfile(null);
+    if (user) {
+      loadProfile();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const handleRefresh = async () => {
     if (!supabase) return;
     setLoading(true);
     try {
       await supabase.auth.refreshSession();
+      await loadProfile();
     } catch (e) {
       setError(e?.message || "Could not refresh session.");
     } finally {
@@ -43,7 +66,8 @@ export function Profile({ navigate, user, onSignInClick, onSignOut }) {
             </div>
           ) : (
             <div style={{ display: "grid", gap: 12 }}>
-              <div><strong>Email:</strong> {profileEmail}</div>
+              <div><strong>Email:</strong> {profile?.email || user.email}</div>
+              {profile?.display_name && <div><strong>Display Name:</strong> {profile.display_name}</div>}
               <div><strong>User ID:</strong> {user.id}</div>
               <div style={{ display: "flex", gap: 8 }}>
                 <Button variant="secondary" onClick={handleRefresh} disabled={loading}>
